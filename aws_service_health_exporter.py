@@ -72,7 +72,11 @@ def parse_args():
 
 
 def generate_prometheus_metrics_as_text():
-    REGISTRY.register(AwsShdCollector())
+    try:
+        REGISTRY.register(AwsShdCollector())
+    except ValueError:
+        pass
+
     return generate_latest(registry=REGISTRY).decode('utf-8')
 
 
