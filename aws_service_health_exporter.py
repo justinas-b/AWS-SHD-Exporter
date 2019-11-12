@@ -8,6 +8,7 @@ from lxml import html
 import argparse
 
 
+
 class AwsShdCollector(object):
 
     def __init__(self):
@@ -17,11 +18,17 @@ class AwsShdCollector(object):
     @staticmethod
     def shd_status_to_int(status):
         status_dict = {
-            'Service is operating normally': 4,
-            'Informational message': 3,
-            'Service degradation': 2,
-            'Service disruption': 1
+            # 'Service is operating normally': 4,
+            # 'Informational message': 3,
+            # 'Service degradation': 2,
+            # 'Service disruption': 1
+            '/images/status0.gif': 4,
+            '/images/status1.gif': 3,
+            '/images/status2.gif': 2,
+            '/images/status3.gif': 1
         }
+        
+
         return status_dict.get(status)
 
     @staticmethod
@@ -39,18 +46,19 @@ class AwsShdCollector(object):
     def collect(self):
         g = GaugeMetricFamily(name="aws_service_health",
                               documentation='Metrics for all AWS Services',
-                              labels=['continent', 'region', 'service', 'status'])
+                              labels=['continent', 'region', 'service'])
 
         raw_page = requests.get(self.endpoint)
         html_page = html.fromstring(raw_page.content)
 
         for continent in self.continents:
-            table = html_page.xpath(f'//div[@id="{continent}_block"]/table/tbody')[1]
-            for row in table.xpath('.//tr'):
-                td = row.xpath('.//td')
-                service, region = self.split_aws_service(td[1].text)
-                g.add_metric(labels=[continent, region, service, td[2].text],
-                             value=self.shd_status_to_int(td[2].text))
+            tables = html_page.xpath(f'//div[@id="{continent}_block"]/table/tbody')
+            for table in tables:
+                for row in table.xpath('.//tr'):
+                    td = row.xpath('.//td')
+                    service, region = self.split_aws_service(td[1].text)
+                    status = self.shd_status_to_int(td[0].getchildren()[0].attrib['src'])
+                    g.add_metric(labels=[continent, region, service], value=status)
         yield g
 
 
@@ -76,7 +84,7 @@ def generate_prometheus_metrics_as_text():
         REGISTRY.register(AwsShdCollector())
     except ValueError:
         pass
-
+        
     return generate_latest(registry=REGISTRY).decode('utf-8')
 
 
